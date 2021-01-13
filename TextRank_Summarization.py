@@ -1,10 +1,10 @@
 import re
-from pprint import pprint
 import numpy as np
 from nltk import sent_tokenize, word_tokenize
 from nltk.cluster.util import cosine_distance
 from nltk.corpus import stopwords
 
+# added english stopwords
 stop_words = stopwords.words('english')
 MULTIPLE_WHITESPACE_PATTERN = re.compile(r"\s+", re.UNICODE)
 def normalize_whitespace(text):
@@ -141,7 +141,7 @@ class TextRank4Sentences():
                 #print(str(sorted_pr[index]) + " : " + str(self.pr_vector[sorted_pr[index]]))
                 sent = self.sentences[sorted_pr[index]]
                 sent = normalize_whitespace(sent)
-                top_sentences[index] = sent
+                top_sentences[index] = sent + " : " + str(self.pr_vector[sorted_pr[index]])
                 index += 1
 
         return top_sentences
@@ -184,7 +184,7 @@ The ruling party is also reviewing a fourth round of disaster relief, to potenti
 tr4sh = TextRank4Sentences()
 print('<PageRank Vector>')
 tr4sh.analyze(text_str, stop_words)
-top_sentences = tr4sh.get_top_sentences(3)
+top_sentences = tr4sh.get_top_sentences(5)
 print()
 
 print("<Summarization>")
