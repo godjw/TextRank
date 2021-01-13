@@ -3,7 +3,9 @@ from pprint import pprint
 import numpy as np
 from nltk import sent_tokenize, word_tokenize
 from nltk.cluster.util import cosine_distance
+from nltk.corpus import stopwords
 
+stop_words = stopwords.words('english')
 MULTIPLE_WHITESPACE_PATTERN = re.compile(r"\s+", re.UNICODE)
 def normalize_whitespace(text):
     """
@@ -20,7 +22,6 @@ def _replace_whitespace(match):
         return "\n"
     else:
         return " "
-
 
 def is_blank(string):
     """
@@ -48,9 +49,6 @@ def core_cosine_similarity(vector1, vector2):
     """
     return 1 - cosine_distance(vector1, vector2)
 
-'''
-Note: This is not a summarization algorithm. This Algorithm pics top sentences irrespective of the order they appeared.
-'''
 class TextRank4Sentences():
     def __init__(self):
         self.damping = 0.85  # damping coefficient, usually is .85
@@ -140,10 +138,10 @@ class TextRank4Sentences():
 
             index = 0
             for epoch in range(number):
-                print(str(sorted_pr[index]) + " : " + str(self.pr_vector[sorted_pr[index]]))
+                #print(str(sorted_pr[index]) + " : " + str(self.pr_vector[sorted_pr[index]]))
                 sent = self.sentences[sorted_pr[index]]
                 sent = normalize_whitespace(sent)
-                top_sentences[sent] = self.pr_vector[sorted_pr[index]]
+                top_sentences[index] = sent
                 index += 1
 
         return top_sentences
@@ -157,15 +155,39 @@ class TextRank4Sentences():
         similarity_matrix = self._build_similarity_matrix(tokenized_sentences, stop_words)
 
         self.pr_vector = self._run_page_rank(similarity_matrix)
+
         print(self.pr_vector)
 
 
-text_str = '''
-    Those Who Are Resilient Stay In The Game Longer
-    “On the mountains of truth you can never climb in vain: either you will reach a point higher up today, or you will be training your powers so that you will be able to climb higher tomorrow.” — Friedrich Nietzsche
-    Challenges and setbacks are not meant to defeat you, but promote you. However, I realise after many years of defeats, it can crush your spirit and it is easier to give up than risk further setbacks and disappointments. Have you experienced this before? To be honest, I don’t have the answers. I can’t tell you what the right course of action is; only you will know. However, it’s important not to be discouraged by failure when pursuing a goal or a dream, since failure itself means different things to different people. To a person with a Fixed Mindset failure is a blow to their self-esteem, yet to a person with a Growth Mindset, it’s an opportunity to improve and find new ways to overcome their obstacles. Same failure, yet different responses. Who is right and who is wrong? Neither. Each person has a different mindset that decides their outcome. Those who are resilient stay in the game longer and draw on their inner means to succeed.
-    '''
+text_str = """
+Small-business owners are taking legal action against the government, calling the social distancing rules unfair and saying the restrictions have greatly diminished their chances of economic survival. On Monday, a group representing coffee shop owners in South Korea announced that around 200 of its members would lodge a suit against the government later this week demanding compensation for business lost as a result of the government’ social distancing rules. In the suit, to be filed with the Seoul Central District Court on Thursday, the group said it would demand around 1 billion won ($908,638), or 5 million won for each cafe owner involved. Since late November, when Level 2 social distancing rules were imposed in Seoul, Incheon and Gyeonggi Province, coffee shops in the capital region have been barred from providing dine-in services.
+That restriction was extended to coffee shops in other parts of the country in early December, when the government imposed Level 2.5 social distancing rules in the capital region and Level 2 rules for the rest of the country. “We are filing this lawsuit out of desperation as the government’s COVID-19 regulations have put our lives on the edge,” said Ko Jang-soo, head of the cafe owners’ association. “We ask the government to prepare fair and consistent measures.” Cafe owners are not alone in taking issue with the distancing guidelines.
+According to a survey of 1,018 small businesses carried out by the Korean Federation of Micro Enterprises in November, 70.8 percent of the respondents said their 2020 sales had dropped from a year earlier, with the average loss estimated at 37.4 percent.
+Some 53.5 percent of respondents found the government’s support insufficient, with nearly half of that number calling it a temporary solution.
+Since last week, many owners of coffee shops, bars and internet cafes have staged protests against the government. Owners of indoor sports facilities started the movement after the apparent suicide of a gym owner in Daegu who was experiencing financial difficulties.
+They argue that their businesses should not face tougher restrictions than restaurants, which are still allowed to offer dining in. The restrictions have drawn consumers away and left the owners with debts piling up, they say.
+“I pay around 10 million won in operation fees for the fitness club, and with the COVID-19 pandemic, I am now left with 1.9 million won in my bank account and 90 million won in bank debt,” said Oh Sung-young, head of a gym owners’ association, in a Facebook post Thursday.
+Another representative group for owners of indoor fitness centers followed the lead of coffee shop owners to also file a lawsuit of 203 plaintiffs with the Seoul Western District Court on Tuesday, demanding 5 million won for each gym owner involved.
+The group had filed a separate lawsuit last month asking for 765 million won from the government for fitness center owners’ businesses losses from social distancing rules.
+Businesses argue that the government has not done proper research into the steps small merchants have taken to prevent the spread of the coronavirus within their facilities.
+A number of cafes have spaced out their tables to ensure greater distance among customers, and gym owners have installed dividers between exercise machines so that no droplets can pass from one person to one another.
+Some business owners have bought extra hand sanitizer and cleaning supplies to ensure safety for customers, only to find that no one was allowed inside.
+“I simply wasted my own precious money to buy all these useless plastic dividers that are now covered in dust,” said an independent cafe owner in Gangnam District, southern Seoul, who wished to remain anonymous.
+“Nobody is going to pay me back for the dividers, I get that. But the only thing I want from politicians and civil workers is for them to just actually visit the businesses that are in trouble and learn on-site how much effort businesses have made to follow reasonable virus control measures.”
+In response, the government and the ruling Democratic Party pledged to come up with additional steps to help small businesses recoup their losses.
+“Our hearts are heavy in listening to desperate cries from small-business owners and proprietors in sectors that experienced suspension or limits to their operation,” said Democratic Party Floor Leader Kim Tae-nyeon in a party meeting Monday.
+“The Democratic Party and the government will not turn away from the pain of small merchants and concentrate all of our policy efforts to provide support.”
+The country on Monday started its third emergency cash relief program, offering up to 3 million won each for around 2.5 million small-business owners, freelancers and contract laborers.
+The ruling party is also reviewing a fourth round of disaster relief, to potentially benefit all Koreans, following the lead of party Chairman Lee Nak-yon.
+"""
 
 tr4sh = TextRank4Sentences()
-tr4sh.analyze(text_str)
-pprint(tr4sh.get_top_sentences(5), width=1, depth=2)
+print('<PageRank Vector>')
+tr4sh.analyze(text_str, stop_words)
+top_sentences = tr4sh.get_top_sentences(3)
+print()
+
+print("<Summarization>")
+for k, v in top_sentences.items():
+    print("%d. %s"%(k + 1, v))
+
