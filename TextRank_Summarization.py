@@ -1,17 +1,17 @@
 import re
 import numpy as np
+import nltk
 from nltk import sent_tokenize, word_tokenize
 from nltk.cluster.util import cosine_distance
 from nltk.corpus import stopwords
-import spacy
 from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.preprocessing import normalize
-
+from nltk.stem import WordNetLemmatizer
+from nltk.corpus import wordnet
 
 # added english stopwords
 stop_words = stopwords.words('english')
 MULTIPLE_WHITESPACE_PATTERN = re.compile(r"\s+", re.UNICODE)
-
+lemmatizer = WordNetLemmatizer()
 
 def normalize_whitespace(text):
     """
@@ -57,6 +57,40 @@ def core_cosine_similarity(vector1, vector2):
     """
     return 1 - cosine_distance(vector1, vector2)
 
+
+def pos_tagger(nltk_tag):
+    if nltk_tag.startswith('J'):
+        return wordnet.ADJ
+    elif nltk_tag.startswith('V'):
+        return wordnet.VERB
+    elif nltk_tag.startswith('N'):
+        return wordnet.NOUN
+    elif nltk_tag.startswith('R'):
+        return wordnet.ADV
+    else:
+        return None
+
+
+def lemmatize_text(text):
+    lemmatized_text = ""
+    for sentence in text:
+        # tokenize the sentence and find the POS tag for each token
+        pos_tagged = nltk.pos_tag(nltk.word_tokenize(sentence))
+
+        # we use our own pos_tagger function to make things simpler to understand.
+        wordnet_tagged = list(map(lambda x: (x[0], pos_tagger(x[1])), pos_tagged))
+
+        lemmatized_sentence = []
+        for word, tag in wordnet_tagged:
+            if tag is None:
+                # if there is no available tag, append the token as is
+                lemmatized_sentence.append(word)
+            else:
+                # else use the tag to lemmatize the token
+                lemmatized_sentence.append(lemmatizer.lemmatize(word, tag))
+        lemmatized_sentence = " ".join(lemmatized_sentence)
+        lemmatized_text += lemmatized_sentence + " "
+    return lemmatized_text
 
 class TextRank4Sentences():
     def __init__(self):
@@ -198,16 +232,19 @@ class TextRank4Sentences():
 
         return top_sentences
 
-    def analyze(self, text, stop_words=None):
+    def analyze(self, text, stop_words=None, lem_flag=0):
         self.text_str = text
         self.sentences = sent_tokenize(self.text_str)
 
+        if lem_flag == 0:
+            temp = self.sentences
+        else:
+            temp = sent_tokenize(lemmatize_text(self.sentences))
         # 특수문자 제거
         eng_sentences = []
-        for sent in self.sentences:
-            sent = re.sub('[^a-zA-Z0-9]', ' ', sent)
+        for sent in temp:
+            sent = re.sub('[^a-zA-Z]', ' ', sent)
             eng_sentences.append(sent)
-
         tokenized_sentences = [word_tokenize(sent) for sent in eng_sentences]
 
         # stopwords를 제거한 tokenized sentences
@@ -224,34 +261,32 @@ class TextRank4Sentences():
 
         self.pr_vector = self._run_page_rank(similarity_matrix)
         self.pr_vector2 = self._run_page_rank(correlation_matrix)
-        # print('simmat\n', similarity_matrix, similarity_matrix.shape)
-        # print('cormat\n', correlation_matrix, correlation_matrix.shape)
+
         print(self.pr_vector)
         print()
         print(self.pr_vector2)
 
 
-text_str = """
-Small-business owners are taking legal action against the government, calling the social distancing rules unfair and saying the restrictions have greatly diminished their chances of economic survival. On Monday, a group representing coffee shop owners in South Korea announced that around 200 of its members would lodge a suit against the government later this week demanding compensation for business lost as a result of the government’ social distancing rules. In the suit, to be filed with the Seoul Central District Court on Thursday, the group said it would demand around 1 billion won ($908,638), or 5 million won for each cafe owner involved. Since late November, when Level 2 social distancing rules were imposed in Seoul, Incheon and Gyeonggi Province, coffee shops in the capital region have been barred from providing dine-in services.
-That restriction was extended to coffee shops in other parts of the country in early December, when the government imposed Level 2.5 social distancing rules in the capital region and Level 2 rules for the rest of the country. “We are filing this lawsuit out of desperation as the government’s COVID-19 regulations have put our lives on the edge,” said Ko Jang-soo, head of the cafe owners’ association. “We ask the government to prepare fair and consistent measures.” Cafe owners are not alone in taking issue with the distancing guidelines.
-According to a survey of 1,018 small businesses carried out by the Korean Federation of Micro Enterprises in November, 70.8 percent of the respondents said their 2020 sales had dropped from a year earlier, with the average loss estimated at 37.4 percent.
-Some 53.5 percent of respondents found the government’s support insufficient, with nearly half of that number calling it a temporary solution.
-Since last week, many owners of coffee shops, bars and internet cafes have staged protests against the government. Owners of indoor sports facilities started the movement after the apparent suicide of a gym owner in Daegu who was experiencing financial difficulties.
-They argue that their businesses should not face tougher restrictions than restaurants, which are still allowed to offer dining in. The restrictions have drawn consumers away and left the owners with debts piling up, they say.
-“I pay around 10 million won in operation fees for the fitness club, and with the COVID-19 pandemic, I am now left with 1.9 million won in my bank account and 90 million won in bank debt,” said Oh Sung-young, head of a gym owners’ association, in a Facebook post Thursday.
-Another representative group for owners of indoor fitness centers followed the lead of coffee shop owners to also file a lawsuit of 203 plaintiffs with the Seoul Western District Court on Tuesday, demanding 5 million won for each gym owner involved.
-The group had filed a separate lawsuit last month asking for 765 million won from the government for fitness center owners’ businesses losses from social distancing rules.
-Businesses argue that the government has not done proper research into the steps small merchants have taken to prevent the spread of the coronavirus within their facilities.
-A number of cafes have spaced out their tables to ensure greater distance among customers, and gym owners have installed dividers between exercise machines so that no droplets can pass from one person to one another.
-Some business owners have bought extra hand sanitizer and cleaning supplies to ensure safety for customers, only to find that no one was allowed inside.
-“I simply wasted my own precious money to buy all these useless plastic dividers that are now covered in dust,” said an independent cafe owner in Gangnam District, southern Seoul, who wished to remain anonymous.
-“Nobody is going to pay me back for the dividers, I get that. But the only thing I want from politicians and civil workers is for them to just actually visit the businesses that are in trouble and learn on-site how much effort businesses have made to follow reasonable virus control measures.”
-In response, the government and the ruling Democratic Party pledged to come up with additional steps to help small businesses recoup their losses.
-“Our hearts are heavy in listening to desperate cries from small-business owners and proprietors in sectors that experienced suspension or limits to their operation,” said Democratic Party Floor Leader Kim Tae-nyeon in a party meeting Monday.
-“The Democratic Party and the government will not turn away from the pain of small merchants and concentrate all of our policy efforts to provide support.”
-The country on Monday started its third emergency cash relief program, offering up to 3 million won each for around 2.5 million small-business owners, freelancers and contract laborers.
-The ruling party is also reviewing a fourth round of disaster relief, to potentially benefit all Koreans, following the lead of party Chairman Lee Nak-yon.
-"""
+text_str = """The coronavirus pandemic and a series of hedge fund turmoils last year have impeded the growth of private funds managed by asset management companies in South Korea, data showed Thursday.
+
+According to data by the Korea Financial Investment Association, the combined assets managed by Korea-domiciled private funds grew 5.7 percent to 438.7 trillion won ($398.4 billion) in 2020, far lower than their 2019 growth which stood at 23.5 percent. Between 2014 and 2019, the funds grew 18.8 percent annually. Private funds refer to instruments composed of no more than 49 end-investors under Korean rules.
+
+The size of private funds dedicated to outbound investment increased 12.6 percent in 2020, slower than it had been over the past five years, when it grew 26.1 percent each year on average.
+
+The trend is largely attributable to mounting public distrust in private funds that are subject to looser regulations and restrictions on due diligence of foreign real assets -- considered the favored destinations of such funds -- wrote Oh Gwang-young, an analyst at Shinyoung Securities.
+
+“The shady performances by a few private funds dedicated to alternative assets have sagged investor sentiment, while COVID-19 hampered the creation of new investments (in private funds),” Oh said.
+
+Korea in 2020 suffered trillion-won misselling scandals involving Korean hedge funds Lime Asset Management and Optimus Asset Management -- accused of misrepresenting fund performances to end-investors -- as well as commercial banks‘ misselling of securities linked to derivatives tied to German bond yields. This led to a 5.7 percent fall of hedge fund assets under management by private funds in 2020, for the first time in the record since 2015.
+
+The growth of private funds’ investment in real estate and infrastructure -- which account for nearly 50 percent of the total assets under management -- has also slowed down to nearly half of the level of the five-year average.
+
+This is associated with the decrease in outbound real asset investment of Korean investors. According to intelligence firm Real Capital Analytics, Korean investors‘ cross-border investments came to a total of $8.5 billion in 2020, shrinking to less than half of $18.4 billion in 2019.
+
+Moreover, another set of data indicated that Korean investments in foreign alternative assets are still laden with risks. According to data from the watchdog Financial Supervisory Service, nearly 16 percent of outbound real asset investment by investment banks -- which connect sellers with institutional investors by retaining the sellers’ assets and later selling it down to the institutions -- are categorized as being either prone to delinquencies or losses.
+
+Oh said the pace of growth in private funds investing in real assets will pick up the pieces as long as the world resolves COVID-19 issues. But the rebound of hedge funds is unlikely even in a post-COVID-19 era, Oh added."""
+
 
 tr4sh = TextRank4Sentences()
 print('<PageRank Vector>')
@@ -268,4 +303,26 @@ print()
 print("<Summarization Using TF-IDF & Cosine Similarity>")
 for k, v in top_sentence_tfidf.items():
     print("%d. %s"%(k + 1, v))
+print()
+
+print('<PageRank Vector(lemmatized)>')
+tr4sh.analyze(text_str, stop_words, lem_flag=1)
+top_sentence = tr4sh.get_top_sentences(5)
+top_sentence_tfidf = tr4sh.get_top_sentences2(5)
+print()
+
+print("<Summarization Using Cosine Similarity + Lemmatization>")
+for k, v in top_sentence.items():
+    print("%d. %s"%(k + 1, v))
+print()
+
+print("<Summarization Using TF-IDF & Cosine Similarity + Lemmatization>")
+for k, v in top_sentence_tfidf.items():
+    print("%d. %s"%(k + 1, v))
+
+
+
+
+
+
 
