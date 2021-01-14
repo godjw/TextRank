@@ -3,10 +3,16 @@ import numpy as np
 from nltk import sent_tokenize, word_tokenize
 from nltk.cluster.util import cosine_distance
 from nltk.corpus import stopwords
+import spacy
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.preprocessing import normalize
+
 
 # added english stopwords
 stop_words = stopwords.words('english')
 MULTIPLE_WHITESPACE_PATTERN = re.compile(r"\s+", re.UNICODE)
+
+
 def normalize_whitespace(text):
     """
     Translates multiple whitespace into single space character.
@@ -15,6 +21,7 @@ def normalize_whitespace(text):
     """
     return MULTIPLE_WHITESPACE_PATTERN.sub(_replace_whitespace, text)
 
+
 def _replace_whitespace(match):
     text = match.group()
 
@@ -22,6 +29,7 @@ def _replace_whitespace(match):
         return "\n"
     else:
         return " "
+
 
 def is_blank(string):
     """
@@ -49,6 +57,7 @@ def core_cosine_similarity(vector1, vector2):
     """
     return 1 - cosine_distance(vector1, vector2)
 
+
 class TextRank4Sentences():
     def __init__(self):
         self.damping = 0.85  # damping coefficient, usually is .85
@@ -57,6 +66,10 @@ class TextRank4Sentences():
         self.text_str = None
         self.sentences = None
         self.pr_vector = None
+
+        # added for tf-idf
+        self.pr_vector2 = None
+        self.tfidf = TfidfVectorizer()
 
     def _sentence_similarity(self, sent1, sent2, stopwords=None):
         if stopwords is None:
@@ -84,6 +97,25 @@ class TextRank4Sentences():
 
         return core_cosine_similarity(vector1, vector2)
 
+    def _build_sent_graph(self, sentences):
+        tfidf_mat = self.tfidf.fit_transform(sentences).toarray()
+        graph_sentence = np.dot(tfidf_mat, tfidf_mat.T)
+        sm = np.zeros([len(sentences), len(sentences)])
+
+        for idx1 in range(len(graph_sentence)):
+            for idx2 in range(len(graph_sentence)):
+                if idx1 == idx2:
+                    continue
+                sm[idx1][idx2] = core_cosine_similarity(graph_sentence[idx1], graph_sentence[idx2])
+
+        sm = get_symmetric_matrix(sm)
+
+        # Normalize matrix by column
+        norm = np.sum(sm, axis=0)
+        sm_norm = np.divide(sm, norm, where=norm != 0)  # this is to ignore the 0 element in norm
+
+        return sm_norm
+    
     def _build_similarity_matrix(self, sentences, stopwords=None):
         # create an empty similarity matrix
         sm = np.zeros([len(sentences), len(sentences)])
@@ -138,10 +170,30 @@ class TextRank4Sentences():
 
             index = 0
             for epoch in range(number):
-                #print(str(sorted_pr[index]) + " : " + str(self.pr_vector[sorted_pr[index]]))
+                # print(str(sorted_pr[index]) + " : " + str(self.pr_vector[sorted_pr[index]]))
                 sent = self.sentences[sorted_pr[index]]
                 sent = normalize_whitespace(sent)
                 top_sentences[index] = sent + " : " + str(self.pr_vector[sorted_pr[index]])
+                index += 1
+
+        return top_sentences
+
+    def get_top_sentences2(self, number=5):
+
+        top_sentences = {}
+
+        if self.pr_vector2 is not None:
+
+            sorted_pr = np.argsort(self.pr_vector2)
+            sorted_pr = list(sorted_pr)
+            sorted_pr.reverse()
+
+            index = 0
+            for epoch in range(number):
+                # print(str(sorted_pr[index]) + " : " + str(self.pr_vector[sorted_pr[index]]))
+                sent = self.sentences[sorted_pr[index]]
+                sent = normalize_whitespace(sent)
+                top_sentences[index] = sent + " : " + str(self.pr_vector2[sorted_pr[index]])
                 index += 1
 
         return top_sentences
@@ -150,13 +202,33 @@ class TextRank4Sentences():
         self.text_str = text
         self.sentences = sent_tokenize(self.text_str)
 
-        tokenized_sentences = [word_tokenize(sent) for sent in self.sentences]
+        # 특수문자 제거
+        eng_sentences = []
+        for sent in self.sentences:
+            sent = re.sub('[^a-zA-Z0-9]', ' ', sent)
+            eng_sentences.append(sent)
 
+        tokenized_sentences = [word_tokenize(sent) for sent in eng_sentences]
+
+        # stopwords를 제거한 tokenized sentences
+        rm_tokenized_sentences = []
+        for sent in tokenized_sentences:
+            temp = []
+            for word in sent:
+                if word not in stop_words:
+                    temp.append(word)
+            rm_tokenized_sentences.append(' '.join(temp))
+
+        correlation_matrix = self._build_sent_graph(rm_tokenized_sentences)
         similarity_matrix = self._build_similarity_matrix(tokenized_sentences, stop_words)
 
         self.pr_vector = self._run_page_rank(similarity_matrix)
-
+        self.pr_vector2 = self._run_page_rank(correlation_matrix)
+        # print('simmat\n', similarity_matrix, similarity_matrix.shape)
+        # print('cormat\n', correlation_matrix, correlation_matrix.shape)
         print(self.pr_vector)
+        print()
+        print(self.pr_vector2)
 
 
 text_str = """
@@ -184,10 +256,16 @@ The ruling party is also reviewing a fourth round of disaster relief, to potenti
 tr4sh = TextRank4Sentences()
 print('<PageRank Vector>')
 tr4sh.analyze(text_str, stop_words)
-top_sentences = tr4sh.get_top_sentences(5)
+top_sentence = tr4sh.get_top_sentences(5)
+top_sentence_tfidf = tr4sh.get_top_sentences2(5)
 print()
 
-print("<Summarization>")
-for k, v in top_sentences.items():
+print("<Summarization Using Cosine Similarity>")
+for k, v in top_sentence.items():
+    print("%d. %s"%(k + 1, v))
+print()
+
+print("<Summarization Using TF-IDF & Cosine Similarity>")
+for k, v in top_sentence_tfidf.items():
     print("%d. %s"%(k + 1, v))
 
