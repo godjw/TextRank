@@ -1,4 +1,4 @@
-# TextRank
+# TextRank_Summarization
 Practice extractive text summarization with TextRank algorithm using cosine similarity between sentences.
 Prints setences in order of the textrank value.
 
