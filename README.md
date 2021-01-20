@@ -7,3 +7,9 @@ Prints results on two types of text(original text, lemmatized text) using cosine
 To run the code
 !pip install nltk
 
+</hr>
+
+# textrank_test
+
+Jupyter notebook file to show how the textrank algorithm file works.
+Shows how to vectorize sentences via BoW, TF-IDF methods, calculate cosine similarity between sentences and create setence graphs.
